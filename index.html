@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0c1330" />
+  <title>Sort Sol</title>
+  <meta name="description" content="Før en sort sol af stære gennem skumringen — hold sværmen samlet, falken tager de ensomme." />
+  <link rel="manifest" href="manifest.json?v=1" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Sort Sol" />
+  <link rel="stylesheet" href="css/style.css?v=1" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hud" hidden>
+    <div class="hud-left">
+      <span class="hud-flock"><span id="flockCount">0</span> stære</span>
+    </div>
+    <div class="hud-right">
+      <span class="hud-score" id="score">0</span>
+    </div>
+  </div>
+  <div id="banner" class="banner" hidden></div>
+
+  <!-- Start screen -->
+  <div id="start" class="overlay">
+    <div class="card">
+      <h1 class="title">SORT&nbsp;SOL</h1>
+      <p class="subtitle">Før stærenes sorte sol gennem skumringen</p>
+      <button id="startBtn" class="btn">Flyv</button>
+      <p class="how">Træk for at føre sværmen.<br>Hold den <b>samlet</b> — falken tager de ensomme stære.</p>
+      <p class="best" id="startBest" hidden></p>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="overlay" hidden>
+    <div class="card">
+      <h2 class="title small">Pause</h2>
+      <button id="resumeBtn" class="btn">Fortsæt</button>
+      <button id="quitBtn" class="btn ghost">Giv op</button>
+    </div>
+  </div>
+
+  <!-- Game over -->
+  <div id="over" class="overlay" hidden>
+    <div class="card">
+      <h2 class="title small">Sværmen er væk</h2>
+      <div class="stats" id="overStats"></div>
+      <button id="againBtn" class="btn">Flyv igen</button>
+    </div>
+  </div>
+
+  <button id="pauseBtn" class="pause-btn" hidden aria-label="Pause">❚❚</button>
+
+  <script type="module" src="js/main.js?v=1"></script>
+</body>
+</html>

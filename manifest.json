@@ -1,0 +1,16 @@
+{
+  "name": "Sort Sol",
+  "short_name": "Sort Sol",
+  "description": "Før en sort sol af stære gennem skumringen — hold sværmen samlet, falken tager de ensomme.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c1330",
+  "theme_color": "#0c1330",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
