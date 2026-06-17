@@ -123,6 +123,30 @@ export function gather(){
   tone(f, 0.35, 'triangle', 0.12);
 }
 
+// dodged a dive — bright rewarding ping, rises with combo
+export function nearMiss(combo){
+  if (!ctx) return;
+  const base = Math.min(combo||1, 8);
+  const a = PENT[3 + base], b = PENT[5 + Math.min(base,5)];
+  tone(a, 0.18, 'triangle', 0.13);
+  setTimeout(()=> tone(b, 0.28, 'triangle', 0.13), 70);
+}
+
+// Sus burst — a big airy whoosh + soft body
+export function burst(){
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=0.7;
+  bp.frequency.setValueAtTime(500, t0); bp.frequency.exponentialRampToValueAtTime(2400, t0+0.25);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.16, t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+0.34);
+  src.connect(bp).connect(g).connect(master);
+  src.start(t0); src.stop(t0+0.4);
+  tone(196, 0.22, 'sine', 0.08);
+}
+
 // reaching a roost — gentle rising pentatonic
 export function chime(){
   if (!ctx) return;

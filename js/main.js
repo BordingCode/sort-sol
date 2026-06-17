@@ -32,25 +32,43 @@ window.addEventListener('orientationchange', ()=> setTimeout(resize, 200));
 resize();
 
 // ---------- loop ----------
-let last = performance.now(), acc = 0, running = true, paused = false;
+let last = performance.now(), acc = 0, running = true, paused = false, slowmo = 0;
 function frame(now){
   if (!running){ requestAnimationFrame(frame); return; }
   let dt = (now - last)/1000; last = now;
   if (dt > 0.1) dt = 0.1;
+  if (slowmo > 0) slowmo -= dt;
+  const ts = slowmo > 0 ? 0.4 : 1;          // brief slow-mo on a dodge
   if (!paused){
-    acc += dt; let steps = 0;
+    acc += dt * ts; let steps = 0;
     while (acc >= STEP && steps < MAX_STEPS){ world.update(STEP); drainEvents(); acc -= STEP; steps++; }
     if (steps >= MAX_STEPS) acc = 0;
   }
   renderer.draw(ctx, world, dt);
   A.setTension(world.idle ? 0 : world.tension);
-  if (gameState === 'play' && !world.idle){
-    $('#flockCount').textContent = world.birds.length;
-    $('#score').textContent = Math.floor(world.score);
-  }
+  if (gameState === 'play' && !world.idle) updateHud();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+let lastCombo = -1, lastBurst = -1;
+function updateHud(){
+  $('#flockCount').textContent = world.birds.length;
+  $('#score').textContent = Math.floor(world.score);
+  if (world.combo !== lastCombo){
+    lastCombo = world.combo;
+    const c = $('#combo');
+    if (world.combo >= 2){ c.hidden = false; c.textContent = 'Kæde ×'+world.combo;
+      c.style.animation='none'; void c.offsetWidth; c.style.animation=''; }
+    else c.hidden = true;
+  }
+  if (world.burst !== lastBurst){
+    lastBurst = world.burst;
+    const pips = $('#burstPips');
+    pips.innerHTML = Array.from({length: world.tune.burstMax}, (_,i)=> `<i class="${i<world.burst?'on':''}"></i>`).join('');
+    $('#burstBtn').classList.toggle('empty', world.burst<=0);
+  }
+}
 
 // ---------- events from the sim ----------
 let firstFalconShown = false;
@@ -60,12 +78,15 @@ function drainEvents(){
     if (e.type==='stoop') A.screech();
     else if (e.type==='loss') A.loss();
     else if (e.type==='gather') A.gather();
+    else if (e.type==='nearmiss'){ A.nearMiss(e.combo); slowmo = 0.22; }
+    else if (e.type==='burst') A.burst();
     else if (e.type==='roost'){ A.chime(); banner('Raststed', 'sværmen hviler'); }
+    else if (e.type==='newfalcon' && firstFalconShown) banner('Endnu en falk!', e.n+' jæger på sværmen');
     else if (e.type==='gameover') endRun();
   }
   ev.length = 0;
   if (!firstFalconShown && world.falcons.length>0 && gameState==='play'){
-    firstFalconShown = true; banner('En vandrefalk!', 'hold sværmen tæt'); A.screech();
+    firstFalconShown = true; banner('En vandrefalk!', 'tryk Sus for at undvige'); A.screech();
   }
 }
 
@@ -90,9 +111,14 @@ canvas.addEventListener('pointermove', (e)=>{
   lastLX=p.x; lastLY=p.y;
 }, {passive:true});
 
-function endSteer(){ steering = false; world.lead.active = false; }
+function endSteer(){ steering = false; }   // keep lead at last point so you never lose control
 canvas.addEventListener('pointerup', endSteer, {passive:true});
 canvas.addEventListener('pointercancel', endSteer, {passive:true});
+
+// Sus burst (active dodge)
+function fireBurst(){ if (gameState!=='play'||world.idle) return; A.unlock(); world.doBurst(); }
+$('#burstBtn').addEventListener('pointerdown', (e)=>{ e.preventDefault(); fireBurst(); });
+document.addEventListener('keydown', (e)=>{ if (e.code==='Space'){ e.preventDefault(); fireBurst(); } });
 
 // ---------- screens / run flow ----------
 let gameState = 'menu';   // 'menu' | 'play' | 'paused' | 'over'
@@ -115,30 +141,32 @@ function startRun(){
   firstFalconShown = false;
   gameState = 'play'; paused = false;
   $('#start').hidden = true; $('#over').hidden = true; $('#pause').hidden = true;
-  $('#hud').hidden = false; $('#pauseBtn').hidden = false;
+  $('#hud').hidden = false; $('#pauseBtn').hidden = false; $('#burstBtn').hidden = false;
+  lastCombo=-1; lastBurst=-1;
 }
 
 function pauseRun(){
   if (gameState!=='play') return;
-  paused = true; gameState='paused'; $('#pause').hidden=false; $('#pauseBtn').hidden=true;
+  paused = true; gameState='paused'; $('#pause').hidden=false; $('#pauseBtn').hidden=true; $('#burstBtn').hidden=true;
 }
 function resumeRun(){
   if (gameState!=='paused') return;
-  paused=false; gameState='play'; $('#pause').hidden=true; $('#pauseBtn').hidden=false;
+  paused=false; gameState='play'; $('#pause').hidden=true; $('#pauseBtn').hidden=false; $('#burstBtn').hidden=false;
   last = performance.now();
 }
 
 function endRun(){
   gameState='over'; paused=false;
-  $('#hud').hidden = true; $('#pauseBtn').hidden = true;
+  $('#hud').hidden = true; $('#pauseBtn').hidden = true; $('#burstBtn').hidden = true;
   const score = Math.floor(world.score), t = Math.floor(world.time);
   const isBest = score > best.score;
   if (isBest){ best = { score, flock: world.peak, time: t }; saveBest(best); }
   $('#overStats').innerHTML = `
     <div class="row${isBest?' hl':''}"><span class="k">Point</span><span class="v">${score}${isBest?' ★':''}</span></div>
     <div class="row"><span class="k">Overlevet</span><span class="v">${fmtTime(t)}</span></div>
+    <div class="row"><span class="k">Længste kæde</span><span class="v">×${world.comboBest}</span></div>
+    <div class="row"><span class="k">Undvegne dyk</span><span class="v">${world.dodges}</span></div>
     <div class="row"><span class="k">Største sværm</span><span class="v">${world.peak}</span></div>
-    <div class="row"><span class="k">Samlet op</span><span class="v">${world.gathered}</span></div>
     <div class="row"><span class="k">Bedste</span><span class="v">${best.score}</span></div>`;
   $('#over').hidden = false;
   A.gameover();
@@ -147,7 +175,7 @@ function endRun(){
 function toMenu(){
   gameState='menu';
   world.reset(); world.idle = true;
-  $('#pause').hidden=true; $('#over').hidden=true; $('#hud').hidden=true; $('#pauseBtn').hidden=true;
+  $('#pause').hidden=true; $('#over').hidden=true; $('#hud').hidden=true; $('#pauseBtn').hidden=true; $('#burstBtn').hidden=true;
   $('#start').hidden=false; showStartBest();
 }
 
@@ -175,4 +203,4 @@ function saveBest(b){ try{ localStorage.setItem(BEST_KEY, JSON.stringify(b)); }c
 window.__ss = { world, get state(){ return gameState; } };
 
 // ---------- service worker ----------
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=1').catch(()=>{});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js?v=2').catch(()=>{});

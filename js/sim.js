@@ -10,10 +10,12 @@ const TUNE = {
   startBirds: 80, capBirds: 240,
   // falcon — a real threat. Birds barely auto-evade (wFear low); YOU dodge by steering.
   // It commits its dive from close range with a short prediction, so it connects unless you swerve.
-  FEAR_R: 80, LOCK_R: 165, STOOP_R: 165, STRIKE_R: 32, leadTime: 0.28,
-  falconHunt: 142, falconStoop: 404, falconAccel: 1250,
-  // spawns
-  loneEvery: 19, falconGrace: 10, calmEvery: 50, calmLen: 9,
+  FEAR_R: 80, LOCK_R: 175, STOOP_R: 175, STRIKE_R: 32, leadTime: 0.28,
+  falconHunt: 150, falconStoop: 404, falconAccel: 1250,
+  // spawns / pacing — threat is immediate and dense
+  loneEvery: 15, falconGrace: 2, falconRamp: 22, calmEvery: 46, calmLen: 8,
+  // burst ("Sus")
+  burstMax: 3, burstRegen: 3.2, burstInvuln: 0.45, nearMissR: 72,
 };
 
 const rnd = (a,b)=> a + Math.random()*(b-a);
@@ -39,6 +41,9 @@ export class World {
     this.lead = { x: W*0.5, y: H*0.5, active: false };
     this.time = 0; this.score = 0;
     this.peak = this.birds.length; this.lost = 0; this.gathered = 0;
+    this.combo = 0; this.comboBest = 0; this.dodges = 0;
+    this.burst = TUNE.burstMax; this._burstT = 0; this.burstInvuln = 0;
+    this.shock = null; this.flashT = 0; this.floats = [];
     this.calm = 0; this.calmBonusGiven = false;
     this._loneT = TUNE.loneEvery * 0.6;
     this._calmT = TUNE.calmEvery;
@@ -47,6 +52,35 @@ export class World {
     this.state = 'play';
     this.idle = false;
     this._grid = new Map();
+  }
+
+  // ---- active dodge: a coordinated burst that scatters the flock & foils any dive ----
+  doBurst(){
+    if (this.state!=='play' || this.idle || this.burst<=0) return false;
+    this.burst--; this.burstInvuln = TUNE.burstInvuln;
+    const c = this.centroid();
+    this.shock = { x:c.x, y:c.y, life:0, max:0.5 };
+    // kick every bird radially outward from the flock centre
+    for (const b of this.birds){
+      const dx=b.x-c.x, dy=b.y-c.y, d=Math.hypot(dx,dy)||1;
+      const k = 150 + 260*(1 - Math.min(1,d/160));
+      b.vx += dx/d*k; b.vy += dy/d*k;
+    }
+    // any falcon mid-dive is thrown off → counts as a dodge
+    for (const f of this.falcons){
+      if (f.state==='stoop'){ f.state='recover'; f.cooldown=rnd(0.8,1.4); f.lock=0; this._nearMiss(c.x,c.y,true); }
+    }
+    this.emit('burst');
+    return true;
+  }
+  _nearMiss(x,y,fromBurst){
+    this.combo++; if (this.combo>this.comboBest) this.comboBest=this.combo;
+    this.dodges++;
+    const gain = 20 + Math.min(this.combo,12)*12;
+    this.score += gain;
+    this.flashT = 0.18;
+    this.floats.push({ x, y:y-30, vy:-34, life:0, max:1.0, text:'+'+gain, big:this.combo>=3 });
+    this.emit('nearmiss', { x, y, combo:this.combo });
   }
 
   setLead(x,y,active){ this.lead.x=x; this.lead.y=y; this.lead.active=active; }
@@ -113,10 +147,17 @@ export class World {
     // calm bonus + send falcons home
     if (this.calm > 0 && !this.calmBonusGiven){ this.calmBonusGiven = true; }
 
-    // falcon spawning by difficulty
+    // burst recharge + timers
+    if (this.burst < TUNE.burstMax){ this._burstT += step; if (this._burstT>=TUNE.burstRegen){ this._burstT=0; this.burst++; this.emit('charge'); } }
+    if (this.burstInvuln>0) this.burstInvuln -= step;
+    if (this.flashT>0) this.flashT -= step;
+    if (this.shock){ this.shock.life += step; if (this.shock.life>=this.shock.max) this.shock=null; }
+    for (let i=this.floats.length-1;i>=0;i--){ const fl=this.floats[i]; fl.life+=step; fl.y+=fl.vy*step; if(fl.life>=fl.max) this.floats.splice(i,1); }
+
+    // falcon spawning by difficulty — first falcon almost immediately, ramps up
     const target = (this.time > TUNE.falconGrace && this.calm <= 0)
-      ? clamp(1 + Math.floor((this.time - TUNE.falconGrace)/28), 1, 4) : 0;
-    while (this.falcons.length < target) this._spawnFalcon();
+      ? clamp(1 + Math.floor((this.time - TUNE.falconGrace)/TUNE.falconRamp), 1, 4) : 0;
+    while (this.falcons.length < target){ this._spawnFalcon(); this.emit('newfalcon', {n:this.falcons.length}); }
 
     // lone starlings
     this._loneT -= step;
@@ -134,8 +175,8 @@ export class World {
     // sweep birds the falcon took this frame (deferred so the grid stayed valid)
     for (let i=this.birds.length-1;i>=0;i--) if (this.birds[i].dead) this.birds.splice(i,1);
 
-    // scoring scales gently with how many you keep alive
-    this.score += step * (7 + this.birds.length * 0.22);
+    // small survival trickle — most points come from dodging (near-miss combo)
+    this.score += step * (2 + this.birds.length * 0.07);
     if (this.birds.length > this.peak) this.peak = this.birds.length;
 
     // danger/tension for audio + visuals
@@ -251,7 +292,7 @@ export class World {
         if ((b.x-l.x)**2+(b.y-l.y)**2 < 40*40) joined=true; });
       if (joined && this.birds.length<T.capBirds){
         this.birds.push({x:l.x,y:l.y,vx:l.vx,vy:l.vy,n:0});
-        this.lones.splice(i,1); this.gathered++; this.emit('gather');
+        this.lones.splice(i,1); this.gathered++; this.score += 12; this.emit('gather', {x:l.x,y:l.y});
       } else if (l.t>16 || l.x<-60||l.x>this.W+60||l.y<-60||l.y>this.H+60){
         this.lones.splice(i,1);   // wandered off
       }
@@ -302,7 +343,7 @@ export class World {
         if (d<T.LOCK_R) f.lock += step*(0.8+aggr*0.7); else f.lock -= step*0.6;
         f.lock=clamp(f.lock,0,1);
         if (f.lock>=1 && d<T.STOOP_R){
-          f.state='stoop'; f.stoopT=0; f.minD=Infinity; this.emit('stoop');
+          f.state='stoop'; f.stoopT=0; f.minD=Infinity; f.struck=false; this.emit('stoop');
         }
       }
       else if (f.state==='stoop'){
@@ -320,12 +361,14 @@ export class World {
         // strike the nearest bird on contact — dense neighbourhood (high n) confuses the grab
         const near = this._nearestBird(f.x, f.y);
         if (near.i>=0 && near.d<f.minD) f.minD = near.d;
-        if (near.i>=0 && near.d < T.STRIKE_R){
+        if (near.i>=0 && near.d < T.STRIKE_R && this.burstInvuln<=0){
           const killProb = clamp(0.95 - near.n*0.05, 0.35, 0.95);
-          if (Math.random()<killProb) this._kill(near.i);
-          f.state='recover'; f.cooldown=rnd(0.9,1.6)-aggr*0.3; f.lock=0;
+          if (Math.random()<killProb){ this._kill(near.i); f.struck=true; }
+          f.state='recover'; f.cooldown=rnd(0.8,1.4)-aggr*0.3; f.lock=0;
         } else if (f.stoopT>1.3 || (b && Math.hypot(b.x-f.x,b.y-f.y) > T.STOOP_R*1.25)){
-          f.state='recover'; f.cooldown=rnd(0.9,1.6)-aggr*0.3; f.lock=0;   // overshot — you dodged
+          // dive ended with no kill — if it came close, that's a dodge (reward + combo)
+          if (!f.struck && f.minD < T.nearMissR) this._nearMiss(f.x, f.y, false);
+          f.state='recover'; f.cooldown=rnd(0.8,1.4)-aggr*0.3; f.lock=0;
         }
       }
       else { // recover — climb away and rest
@@ -350,7 +393,8 @@ export class World {
     b.dead = true;                       // deferred: sweep after the update so grid indices stay valid
     for (let k=0;k<10;k++) this.puffs.push({
       x:b.x, y:b.y, vx:rnd(-70,70), vy:rnd(-70,70), life:0, max:rnd(0.5,1.0), r:rnd(1.5,3) });
-    this.lost++; this.emit('loss');
+    this.lost++; this.combo = 0;         // losing a bird breaks your dodge streak
+    this.emit('loss', { x:b.x, y:b.y });
   }
   _updatePuffs(step){
     for (let i=this.puffs.length-1;i>=0;i--){

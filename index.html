@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#0c1330" />
   <title>Sort Sol</title>
   <meta name="description" content="Før en sort sol af stære gennem skumringen — hold sværmen samlet, falken tager de ensomme." />
-  <link rel="manifest" href="manifest.json?v=1" />
+  <link rel="manifest" href="manifest.json?v=2" />
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Sort Sol" />
-  <link rel="stylesheet" href="css/style.css?v=1" />
+  <link rel="stylesheet" href="css/style.css?v=2" />
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -25,9 +25,16 @@
     </div>
     <div class="hud-right">
       <span class="hud-score" id="score">0</span>
+      <span class="hud-combo" id="combo" hidden></span>
     </div>
   </div>
   <div id="banner" class="banner" hidden></div>
+
+  <!-- Sus (burst) -->
+  <button id="burstBtn" class="burst-btn" hidden>
+    <span class="burst-label">Sus</span>
+    <span class="burst-pips" id="burstPips"></span>
+  </button>
 
   <!-- Start screen -->
   <div id="start" class="overlay">
@@ -35,7 +42,7 @@
       <h1 class="title">SORT&nbsp;SOL</h1>
       <p class="subtitle">Før stærenes sorte sol gennem skumringen</p>
       <button id="startBtn" class="btn">Flyv</button>
-      <p class="how">Træk for at føre sværmen.<br>Hold den <b>samlet</b> — falken tager de ensomme stære.</p>
+      <p class="how">Træk for at føre sværmen.<br>Tryk <b>Sus</b> for at undvige falkens dyk i sidste øjeblik.<br>Undvig i træk for at bygge en <b>kæde</b> og score.</p>
       <p class="best" id="startBest" hidden></p>
     </div>
   </div>
@@ -60,6 +67,6 @@
 
   <button id="pauseBtn" class="pause-btn" hidden aria-label="Pause">❚❚</button>
 
-  <script type="module" src="js/main.js?v=1"></script>
+  <script type="module" src="js/main.js?v=2"></script>
 </body>
 </html>

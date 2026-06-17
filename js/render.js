@@ -79,6 +79,28 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
+    // ---- burst shockwave ----
+    if (world.shock){
+      const s=world.shock, k=s.life/s.max;
+      ctx.globalAlpha = (1-k)*0.6; ctx.strokeStyle='#f3ecd8'; ctx.lineWidth=3*(1-k)+1;
+      ctx.beginPath(); ctx.arc(s.x,s.y, 20+k*180, 0, 6.2832); ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+
+    // ---- floating score text ----
+    for (const fl of world.floats){
+      const a = 1 - fl.life/fl.max;
+      ctx.globalAlpha = Math.max(0,a);
+      ctx.fillStyle = fl.big ? '#ffe08a' : '#f3ecd8';
+      ctx.font = `700 ${fl.big?24:18}px "Iowan Old Style", Georgia, serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(fl.text, fl.x, fl.y);
+    }
+    ctx.globalAlpha=1; ctx.textAlign='start'; ctx.textBaseline='alphabetic';
+
+    // ---- dodge flash ----
+    if (world.flashT>0){ ctx.fillStyle=`rgba(243,236,216,${(world.flashT/0.18)*0.22})`; ctx.fillRect(0,0,W,H); }
+
     // ---- lead ring (where you're guiding them) ----
     if (world.lead.active && world.state==='play' && !world.idle){
       const pulse = 7 + Math.sin(this.t*4)*2.5;
