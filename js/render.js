@@ -40,15 +40,20 @@ export class Renderer {
     sun.addColorStop(1, 'rgba(255,180,120,0)');
     ctx.fillStyle = sun; ctx.fillRect(0,0,W,H);
 
-    // ---- stars ----
+    // ---- stars (parallax scroll) ----
     ctx.save();
+    const sd = world.dist||0;
     for (const s of this.stars){
+      const sx = ((s.x - sd*0.12) % W + W) % W;
       const a = 0.35 + 0.4*Math.sin(this.t*1.4*s.tw + s.ph);
       ctx.globalAlpha = Math.max(0, a) * (1 - s.y/(H*0.9));
       ctx.fillStyle = '#f3ecd8';
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.2832); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, 6.2832); ctx.fill();
     }
     ctx.restore();
+
+    // ---- barriers (oncoming gauntlet) ----
+    if (world.barriers) for (const ba of world.barriers) this._barrier(ctx, ba);
 
     // ---- lone starlings (faint warm hint so they invite gathering) ----
     if (world.lones.length){
@@ -111,7 +116,7 @@ export class Renderer {
     }
 
     // ---- marsh reeds (foreground) ----
-    this._reeds(ctx, calm);
+    this._reeds(ctx, world);
 
     // ---- danger vignette ----
     if (tens>0.02){
@@ -165,16 +170,47 @@ export class Renderer {
     ctx.restore();
   }
 
-  _reeds(ctx, calm){
-    const {W,H}=this;
-    ctx.fillStyle = calm ? '#1a1426' : '#0b0a16';
+  _reeds(ctx, world){
+    const {W,H}=this; const sd=world.dist||0;
+    ctx.fillStyle = '#0b0a16';
     ctx.fillRect(0, H-10, W, 10);
-    ctx.strokeStyle = calm ? '#221a30' : '#0b0a16'; ctx.lineCap='round';
+    ctx.strokeStyle = '#0b0a16'; ctx.lineCap='round';
     for (const r of this.reeds){
+      const rx = ((r.x - sd*0.6) % W + W) % W;   // foreground parallax
       ctx.lineWidth=r.w;
-      ctx.beginPath(); ctx.moveTo(r.x, H);
-      ctx.quadraticCurveTo(r.x+r.lean*r.h*0.5, H-r.h*0.6, r.x+r.lean*r.h, H-r.h);
+      ctx.beginPath(); ctx.moveTo(rx, H);
+      ctx.quadraticCurveTo(rx+r.lean*r.h*0.5, H-r.h*0.6, rx+r.lean*r.h, H-r.h);
       ctx.stroke();
+    }
+  }
+
+  // an oncoming barrier with a gap to thread
+  _barrier(ctx, ba){
+    const {H}=this; const x=ba.x, w=ba.w, gy0=ba.gapY-ba.gapH/2, gy1=ba.gapY+ba.gapH/2;
+    if (ba.kind==='trees'){
+      ctx.fillStyle='#0c0b18';
+      // top cluster
+      this._treeColumn(ctx, x, w, 0, gy0, ba.seed);
+      this._treeColumn(ctx, x, w, gy1, H, ba.seed+50);
+    } else {
+      // pylon: dark lattice towers from top and bottom
+      ctx.fillStyle='#0e0c1c';
+      ctx.fillRect(x, 0, w, gy0);
+      ctx.fillRect(x, gy1, w, H-gy1);
+      ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+      for (let yy=8; yy<gy0; yy+=16){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy+10); ctx.moveTo(x+w,yy); ctx.lineTo(x,yy+10); ctx.stroke(); }
+      for (let yy=gy1+8; yy<H; yy+=16){ ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy+10); ctx.moveTo(x+w,yy); ctx.lineTo(x,yy+10); ctx.stroke(); }
+    }
+    // glowing gap edges so the opening reads clearly
+    ctx.strokeStyle='rgba(255,210,150,.5)'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x-2, gy0); ctx.lineTo(x+w+2, gy0); ctx.moveTo(x-2, gy1); ctx.lineTo(x+w+2, gy1); ctx.stroke();
+  }
+  _treeColumn(ctx, x, w, y0, y1, seed){
+    let s=seed;
+    const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+    for (let yy=y0; yy<y1; yy+=18){
+      const r = 14 + rnd()*10;
+      ctx.beginPath(); ctx.arc(x+w/2 + (rnd()-0.5)*w, yy, r, 0, 6.2832); ctx.fill();
     }
   }
 }

@@ -1,6 +1,6 @@
 // ===== Sort Sol — network-first service worker =====
 // Bump CACHE on every shippable change.
-const CACHE = 'sort-sol-v2';
+const CACHE = 'sort-sol-v3';
 const ASSETS = [
   './', './index.html', './manifest.json',
   './css/style.css',

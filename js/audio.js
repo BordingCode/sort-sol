@@ -69,7 +69,7 @@ function env(node, peak, dur, t0){
   node.connect(g); return g;
 }
 function tone(freq, dur, type, peak, dest){
-  if (!ctx) return;
+  if (!ctx || !isFinite(freq)) return;
   const t0 = ctx.currentTime;
   const o = ctx.createOscillator(); o.type=type||'sine'; o.frequency.value=freq;
   const g = env(o, peak ?? 0.2, dur, t0);
@@ -123,11 +123,12 @@ export function gather(){
   tone(f, 0.35, 'triangle', 0.12);
 }
 
-// dodged a dive — bright rewarding ping, rises with combo
+// dodged a dive / clean pass — bright rewarding ping, rises with combo
 export function nearMiss(combo){
   if (!ctx) return;
-  const base = Math.min(combo||1, 8);
-  const a = PENT[3 + base], b = PENT[5 + Math.min(base,5)];
+  const base = Math.min(combo||1, 5);
+  const a = PENT[Math.min(3 + base, PENT.length-1)];
+  const b = PENT[Math.min(5 + base, PENT.length-1)];
   tone(a, 0.18, 'triangle', 0.13);
   setTimeout(()=> tone(b, 0.28, 'triangle', 0.13), 70);
 }
